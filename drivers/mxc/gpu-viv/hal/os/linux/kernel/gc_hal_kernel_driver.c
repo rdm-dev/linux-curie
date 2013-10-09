@@ -1,7 +1,7 @@
 /****************************************************************************
 *
 *    Copyright (C) 2005 - 2013 by Vivante Corp.
-*    Copyright (C) 2011-2012 Freescale Semiconductor, Inc.
+*    Copyright (C) 2011-2013 Freescale Semiconductor, Inc.
 *
 *    This program is free software; you can redistribute it and/or modify
 *    it under the terms of the GNU General Public License as published by
@@ -18,7 +18,6 @@
 *    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 *
 *****************************************************************************/
-
 
 #include <linux/device.h>
 #include <linux/slab.h>
