@@ -43,7 +43,7 @@
 #include <linux/dmaengine.h>
 #include <linux/pxp_dma.h>
 #include <linux/mxcfb.h>
-#include <linux/mxcfb_epdc_kernel.h>
+#include <linux/mxcfb_epdc.h>
 #include <linux/gpio.h>
 #include <linux/regulator/driver.h>
 #include <linux/fsl_devices.h>
