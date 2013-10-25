@@ -8427,7 +8427,17 @@ gckOS_StartTimer(
 
     if (unlikely(delayed_work_pending(&timer->work)))
     {
-        cancel_delayed_work(&timer->work);
+        if (unlikely(!cancel_delayed_work(&timer->work)))
+        {
+            cancel_work_sync(&timer->work.work);
+
+            if (unlikely(delayed_work_pending(&timer->work)))
+            {
+                gckOS_Print("gckOS_StartTimer error, the pending worker cannot complete!!!! \n");
+
+                return gcvSTATUS_INVALID_REQUEST;
+            }
+        }
     }
 
     queue_delayed_work(Os->workqueue, &timer->work, msecs_to_jiffies(Delay));
