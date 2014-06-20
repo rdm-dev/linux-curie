@@ -50,7 +50,7 @@ static int rtl821x_config_intr(struct phy_device *phydev)
 
 /* RTL8211B */
 static struct phy_driver rtl821x_driver = {
-	.phy_id		= 0x001cc912,
+	.phy_id		= 0x001cc915, // 0x001cc912: RTL8211B; 0x001cc915: RTL8211E
 	.name		= "RTL821x Gigabit Ethernet",
 	.phy_id_mask	= 0x001fffff,
 	.features	= PHY_GBIT_FEATURES,

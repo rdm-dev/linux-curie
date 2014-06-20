@@ -109,6 +109,9 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
 		case R_ARM_ABS32:
 			*(u32 *)loc += sym->st_value;
 			break;
+		case R_ARM_REL32:
+			*(u32 *)loc += sym->st_value - loc;
+			break;
 
 		case R_ARM_PC24:
 		case R_ARM_CALL:
