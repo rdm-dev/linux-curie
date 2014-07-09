@@ -243,7 +243,6 @@ static struct fec_platform_data fec_data __initdata = {
 	.gpio_irq = MX6_ENET_IRQ,
 };
 
-
 static struct imxi2c_platform_data mx6q_sabresd_i2c_data = {
 	.bitrate = 100000,
 };
@@ -754,6 +753,8 @@ static void __init mx6_sabresd_board_init(void)
 	if (cpu_is_mx6q()) {
 		mxc_iomux_v3_setup_multiple_pads(mx6q_sabresd_pads,
 			ARRAY_SIZE(mx6q_sabresd_pads));
+#if 0
+		/* disable because WindSolve not in 4.0.0 */
 		if (enet_to_gpio_6) {
 			iomux_v3_cfg_t enet_gpio_pad =
 				MX6Q_PAD_GPIO_6__ENET_IRQ_TO_GPIO_6;
@@ -763,6 +764,7 @@ static void __init mx6_sabresd_board_init(void)
 				MX6Q_PAD_GPIO_6__I2C3_SDA;
 			mxc_iomux_v3_setup_pad(i2c3_pad);
 		}
+#endif
 	} else if (cpu_is_mx6dl()) {
 		mxc_iomux_v3_setup_multiple_pads(mx6dl_sabresd_pads,
 			ARRAY_SIZE(mx6dl_sabresd_pads));
