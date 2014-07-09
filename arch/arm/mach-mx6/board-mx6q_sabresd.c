@@ -784,8 +784,6 @@ static void __init mx6_sabresd_board_init(void)
 	// spdif
 	if (cpu_is_mx6q())
 		mxc_iomux_v3_setup_multiple_pads(mx6q_sabresd_spdif_pads, ARRAY_SIZE(mx6q_sabresd_spdif_pads));
-	else if (cpu_is_mx6dl())
-		mxc_iomux_v3_setup_multiple_pads(mx6dl_sabresd_spdif_pads, ARRAY_SIZE(mx6dl_sabresd_spdif_pads));
 
 #ifdef CONFIG_FEC_1588
 	/* Set GPIO_16 input for IEEE-1588 ts_clk and RMII reference clock
