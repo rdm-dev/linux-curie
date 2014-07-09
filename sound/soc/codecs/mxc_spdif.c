@@ -577,6 +577,8 @@ static int mxc_spdif_playback_start(struct snd_pcm_substream *substream,
 	regval &= ~SCR_LOW_POWER;
 	regval |= SCR_TXFIFO_AUTOSYNC | SCR_TXFIFO_NORMAL |
 	    SCR_TXSEL_NORMAL | SCR_USRC_SEL_CHIP | (2 << SCR_TXFIFO_ESEL_BIT);
+	// to clear VAL
+	regval |= SCR_VAL_CLEAR;
 	__raw_writel(regval, SPDIF_REG_SCR + spdif_base_addr);
 
 	/* Default clock source from EXTAL, divider by 8, generate 44.1kHz
