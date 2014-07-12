@@ -107,6 +107,8 @@ static void __init mx6q_curie_init_usb(void)
 }
 
 /* Ethernet FEC */
+#define CURIE_RGMII_RST        IMX_GPIO_NR(1, 25)
+
 static int mx6q_curie_fec_phy_init(struct phy_device *phydev)
 {
 	// RTL8211E: disable Green Ethernet
@@ -144,6 +146,11 @@ static void __init mx6_curie_board_init(void)
 	/* USB Host & OTG */
 	mx6q_curie_init_usb();
 	/* Ethernet: FEC */
+	gpio_request(CURIE_RGMII_RST, "rgmii_reset");
+	gpio_direction_output(CURIE_RGMII_RST, 0);
+	mdelay(15);
+	gpio_direction_output(CURIE_RGMII_RST, 1);
+	mdelay(200);
 	imx6_init_fec(fec_data);
 }
 
