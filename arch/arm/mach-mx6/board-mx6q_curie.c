@@ -104,7 +104,22 @@ static void __init mx6q_curie_init_usb(void)
 	//mx6_set_host1_vbus_func(imx6q_curie_host1_vbus);
 }
 
+/* Ethernet FEC */
+static int mx6q_curie_fec_phy_init(struct phy_device *phydev)
+{
+	// RTL8211E: disable Green Ethernet
+	phy_write(phydev, 31, 0x0003);
+	phy_write(phydev, 25, 0x3246);
+	phy_write(phydev, 16, 0xa87c);
+	phy_write(phydev, 31, 0x0000);
+	return 0;
+}
 
+static struct fec_platform_data fec_data __initdata = {
+	.init = mx6q_curie_fec_phy_init,
+	.phy = PHY_INTERFACE_MODE_RGMII,
+	.gpio_irq = -1,
+};
 
 /* Board Functions */
 static void __init fixup_mxc_board(struct machine_desc *desc, struct tag *tags,
@@ -126,6 +141,8 @@ static void __init mx6_curie_board_init(void)
 	mx6q_curie_init_uart();
 	/* USB Host & OTG */
 	mx6q_curie_init_usb();
+	/* Ethernet: FEC */
+	imx6_init_fec(fec_data);
 }
 
 extern void __iomem *twd_base;
