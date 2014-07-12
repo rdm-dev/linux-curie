@@ -87,8 +87,6 @@ static inline void mx6q_curie_init_uart(void)
 /* USB Host & OTG */
 static void __init mx6q_curie_init_usb(void)
 {
-	int ret = 0;
-
 	imx_otg_base = MX6_IO_ADDRESS(MX6Q_USB_OTG_BASE_ADDR);
 
 	/* For MX6Q:
