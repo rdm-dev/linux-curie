@@ -72,6 +72,11 @@ config REALTEK_PHY
 	---help---
 	  Supports the Realtek 821x PHY.
 
+config RTL8211E_PHY
+	tristate "Drivers for PHY RTL8211E"
+	---help---
+	  Supports the Realtek 8211E PHY.
+
 config NATIONAL_PHY
 	tristate "Drivers for National Semiconductor PHYs"
 	---help---
