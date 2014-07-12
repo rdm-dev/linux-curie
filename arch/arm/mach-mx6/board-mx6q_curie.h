@@ -25,6 +25,10 @@ static iomux_v3_cfg_t mx6q_curie_pads[] = {
 	/* UART1 for debug */
 	MX6Q_PAD_CSI0_DAT10__UART1_TXD,
 	MX6Q_PAD_CSI0_DAT11__UART1_RXD,
+
+	/* USBOTG ID pin */
+	MX6Q_PAD_ENET_RX_ER__ANATOP_USBOTG_ID,
+
 };
 
 #endif

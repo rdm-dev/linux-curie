@@ -78,12 +78,35 @@
 #include "cpu_op-mx6.h"
 #include "board-mx6q_curie.h"
 
+/* Debug Uart */
 static inline void mx6q_curie_init_uart(void)
 {
 	imx6q_add_imx_uart(2, NULL);
 	imx6q_add_imx_uart(0, NULL);
 }
 
+static void __init mx6q_curie_init_usb(void)
+{
+	int ret = 0;
+
+	imx_otg_base = MX6_IO_ADDRESS(MX6Q_USB_OTG_BASE_ADDR);
+
+	if (board_is_mx6_reva())
+		mxc_iomux_set_gpr_register(1, 13, 1, 1);
+	else
+		mxc_iomux_set_gpr_register(1, 13, 1, 0);
+
+	/* USB OTG power is always on */
+	/* USB Host power is managed by the on-board USB hub */
+	/* So we don't need to setup the vbus callback */
+	/* vbus callback prototype: static void (bool) */
+	//mx6_set_otghost_vbus_func(imx6q_curie_usbotg_vbus);
+	//mx6_set_host1_vbus_func(imx6q_curie_host1_vbus);
+}
+
+
+
+/* Board Functions */
 static void __init fixup_mxc_board(struct machine_desc *desc, struct tag *tags,
 				   char **cmdline, struct meminfo *mi)
 {
@@ -99,7 +122,10 @@ static void __init mx6_curie_board_init(void)
 			ARRAY_SIZE(mx6q_curie_pads));
 	}
 
+	/* Debug UART */
 	mx6q_curie_init_uart();
+	/* USB Host & OTG */
+	mx6q_curie_init_usb();
 }
 
 extern void __iomem *twd_base;
