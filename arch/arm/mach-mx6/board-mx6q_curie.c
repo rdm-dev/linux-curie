@@ -81,7 +81,6 @@
 /* Debug Uart */
 static inline void mx6q_curie_init_uart(void)
 {
-	imx6q_add_imx_uart(2, NULL);
 	imx6q_add_imx_uart(0, NULL);
 }
 
