@@ -84,16 +84,21 @@ static inline void mx6q_curie_init_uart(void)
 	imx6q_add_imx_uart(0, NULL);
 }
 
+/* USB Host & OTG */
 static void __init mx6q_curie_init_usb(void)
 {
 	int ret = 0;
 
 	imx_otg_base = MX6_IO_ADDRESS(MX6Q_USB_OTG_BASE_ADDR);
 
-	if (board_is_mx6_reva())
-		mxc_iomux_set_gpr_register(1, 13, 1, 1);
-	else
-		mxc_iomux_set_gpr_register(1, 13, 1, 0);
+	/* For MX6Q:
+	 * GPR1 bit13 meaning:
+	 * Bit13:       0 - selects ENET_RX_ER as the pin of USB_OTG_ID
+	 *              1 - selects GPIO_1 as the pin of USB_OTG_ID
+	 *
+	 * Curie selects ENET_RX_ER
+	 */
+	mxc_iomux_set_gpr_register(1, 13, 1, 0);
 
 	/* USB OTG power is always on */
 	/* USB Host power is managed by the on-board USB hub */
