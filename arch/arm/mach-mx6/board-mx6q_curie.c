@@ -232,6 +232,37 @@ static struct platform_device mx6q_curie_vmmc_reg_devices = {
 	},
 };
 
+/* SDHC2 for Wi-Fi Module */
+static const struct esdhc_platform_data mx6q_curie_sd2_data __initconst = {
+	.always_present = 1,
+	.keep_power_at_suspend = 1,
+	.support_8bit = 1,
+	.delay_line = 0,
+	.cd_type = ESDHC_CD_PERMANENT,
+};
+
+/* SDHC3 for SD Card Slot */
+#define CURIE_SD3_CD        IMX_GPIO_NR(6, 8)
+#define CURIE_SD3_WP        IMX_GPIO_NR(6, 15)
+static const struct esdhc_platform_data mx6q_curie_sd3_data __initconst = {
+	.cd_gpio = CURIE_SD3_CD,
+	.wp_gpio = CURIE_SD3_WP,
+	.keep_power_at_suspend = 1,
+	.support_8bit = 1,
+	.delay_line = 0,
+	.cd_type = ESDHC_CD_CONTROLLER,
+};
+
+/* SDHC4 for eMMC */
+static const struct esdhc_platform_data mx6q_curie_sd4_data __initconst = {
+	.always_present = 1,
+	.keep_power_at_suspend = 1,
+	.support_8bit = 1,
+	.delay_line = 0,
+	.cd_type = ESDHC_CD_PERMANENT,
+};
+
+
 /* Board Functions */
 static void __init fixup_mxc_board(struct machine_desc *desc, struct tag *tags,
 				   char **cmdline, struct meminfo *mi)
@@ -282,6 +313,13 @@ static void __init mx6_curie_board_init(void)
 	imx6q_add_anatop_thermal_imx(1, &mx6q_curie_anatop_thermal_data);
 	/* VMMC Regulator */
 	platform_device_register(&mx6q_curie_vmmc_reg_devices);
+	/* SDHC
+	   Move sd4 to first because sd4 connect to emmc.
+	   Mfgtools want emmc is mmcblk0 and other sd card is mmcblk1.
+	 */
+	imx6q_add_sdhci_usdhc_imx(3, &mx6q_curie_sd4_data);
+	imx6q_add_sdhci_usdhc_imx(1, &mx6q_curie_sd2_data);
+	imx6q_add_sdhci_usdhc_imx(2, &mx6q_curie_sd3_data);
 }
 
 extern void __iomem *twd_base;
