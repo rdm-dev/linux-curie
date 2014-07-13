@@ -125,6 +125,18 @@ static struct fec_platform_data fec_data __initdata = {
 	.gpio_irq = -1,
 };
 
+/* I2C */
+static struct imxi2c_platform_data mx6q_curie_i2c_data = {
+	.bitrate = 100000,
+};
+
+static struct i2c_board_info mx6q_curie_i2c1_board_info[] __initdata = {
+	{
+		I2C_BOARD_INFO("mxc_hdmi_i2c", 0x50),
+	},
+};
+
+
 /* Board Functions */
 static void __init fixup_mxc_board(struct machine_desc *desc, struct tag *tags,
 				   char **cmdline, struct meminfo *mi)
@@ -154,6 +166,11 @@ static void __init mx6_curie_board_init(void)
 	imx6_init_fec(fec_data);
 	/* RTC */
 	imx6q_add_imx_snvs_rtc();
+	/* I2C */
+	imx6q_add_imx_i2c(1, &mx6q_curie_i2c_data);
+	imx6q_add_imx_i2c(2, &mx6q_curie_i2c_data);
+	i2c_register_board_info(1, mx6q_curie_i2c1_board_info,
+			ARRAY_SIZE(mx6q_curie_i2c1_board_info));
 }
 
 extern void __iomem *twd_base;
