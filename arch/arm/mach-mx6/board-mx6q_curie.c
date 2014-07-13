@@ -262,6 +262,131 @@ static const struct esdhc_platform_data mx6q_curie_sd4_data __initconst = {
 	.cd_type = ESDHC_CD_PERMANENT,
 };
 
+/* SATA */
+static struct clk *sata_clk;
+/* HW Initialization, if return 0, initialization is successful. */
+static int mx6q_curie_sata_init(struct device *dev, void __iomem *mmio)
+{
+	u32 tmpdata;
+	int ret = 0, i;
+	struct clk *clk;
+
+	sata_clk = clk_get(dev, "imx_sata_clk");
+	if (IS_ERR(sata_clk)) {
+		dev_err(dev, "no sata clock.\n");
+		return PTR_ERR(sata_clk);
+	}
+	ret = clk_enable(sata_clk);
+	if (ret) {
+		dev_err(dev, "can't enable sata clock.\n");
+		goto put_sata_clk;
+	}
+
+	/* Set PHY Paremeters, two steps to configure the GPR13,
+	 * one write for rest of parameters, mask of first write is 0x07FFFFFD,
+	 * and the other one write for setting the mpll_clk_off_b
+	 *.rx_eq_val_0(iomuxc_gpr13[26:24]),
+	 *.los_lvl(iomuxc_gpr13[23:19]),
+	 *.rx_dpll_mode_0(iomuxc_gpr13[18:16]),
+	 *.sata_speed(iomuxc_gpr13[15]),
+	 *.mpll_ss_en(iomuxc_gpr13[14]),
+	 *.tx_atten_0(iomuxc_gpr13[13:11]),
+	 *.tx_boost_0(iomuxc_gpr13[10:7]),
+	 *.tx_lvl(iomuxc_gpr13[6:2]),
+	 *.mpll_ck_off(iomuxc_gpr13[1]),
+	 *.tx_edgerate_0(iomuxc_gpr13[0]),
+	 */
+	tmpdata = readl(IOMUXC_GPR13);
+	writel(((tmpdata & ~0x07FFFFFF) | 0x0593E4C4), IOMUXC_GPR13);
+
+	/* enable SATA_PHY PLL */
+	tmpdata = readl(IOMUXC_GPR13);
+	writel(((tmpdata & ~0x2) | 0x2), IOMUXC_GPR13);
+
+	usleep_range(100, 200);
+	sata_phy_cr_addr(SATA_PHY_CR_CLOCK_RESET, mmio);
+	sata_phy_cr_write(SATA_PHY_CR_RESET_EN, mmio);
+	usleep_range(100, 200);
+	/* waiting for the rx_pll is stable */
+	for (i = 0; i <= 5; i++) {
+		sata_phy_cr_addr(SATA_PHY_CR_LANE0_OUT_STAT, mmio);
+		sata_phy_cr_read(&ret, mmio);
+		if (ret & SATA_PHY_CR_LANE0_RX_STABLE) {
+			pr_info("sata phy rx_pll is stable!\n");
+			break;
+		} else if (i == 5)
+			pr_info("wating for sata rx_pll lock time out\n");
+		usleep_range(1000, 2000);
+	}
+
+	/* Get the AHB clock rate, and configure the TIMER1MS reg later */
+	clk = clk_get(NULL, "ahb");
+	if (IS_ERR(clk)) {
+		dev_err(dev, "no ahb clock.\n");
+		ret = PTR_ERR(clk);
+		goto release_sata_clk;
+	}
+	tmpdata = clk_get_rate(clk) / 1000;
+	clk_put(clk);
+
+#ifdef CONFIG_SATA_AHCI_PLATFORM
+	ret = sata_init(mmio, tmpdata);
+	if (ret == 0)
+		return ret;
+#else
+	usleep_range(1000, 2000);
+	/* AHCI PHY enter into PDDQ mode if the AHCI module is not enabled */
+	tmpdata = readl(mmio + PORT_PHY_CTL);
+	writel(tmpdata | PORT_PHY_CTL_PDDQ_LOC, mmio + PORT_PHY_CTL);
+	pr_info("No AHCI save PWR: PDDQ %s\n", ((readl(mmio + PORT_PHY_CTL)
+					>> 20) & 1) ? "enabled" : "disabled");
+#endif
+
+release_sata_clk:
+	/* disable SATA_PHY PLL */
+	writel((readl(IOMUXC_GPR13) & ~0x2), IOMUXC_GPR13);
+	clk_disable(sata_clk);
+put_sata_clk:
+	clk_put(sata_clk);
+
+	return ret;
+}
+
+#ifdef CONFIG_SATA_AHCI_PLATFORM
+static void mx6q_curie_sata_exit(struct device *dev)
+{
+	clk_disable(sata_clk);
+	clk_put(sata_clk);
+}
+
+static int imx_ahci_suspend(struct device *dev)
+{
+	writel((readl(IOMUXC_GPR13) & ~0x2), IOMUXC_GPR13);
+	clk_disable(sata_clk);
+
+	return 0;
+}
+
+static int imx_ahci_resume(struct device *dev)
+{
+	int ret;
+
+	ret = clk_enable(sata_clk);
+	if (ret)
+		dev_err(dev, "can't enable sata clock.\n");
+
+	writel(((readl(IOMUXC_GPR13) & ~0x2) | 0x2), IOMUXC_GPR13);
+
+	return 0;
+}
+
+static struct ahci_platform_data mx6q_curie_sata_data = {
+	.init = mx6q_curie_sata_init,
+	.exit = mx6q_curie_sata_exit,
+	.suspend = imx_ahci_suspend,
+	.resume = imx_ahci_resume,
+};
+#endif
 
 /* Board Functions */
 static void __init fixup_mxc_board(struct machine_desc *desc, struct tag *tags,
@@ -320,6 +445,15 @@ static void __init mx6_curie_board_init(void)
 	imx6q_add_sdhci_usdhc_imx(3, &mx6q_curie_sd4_data);
 	imx6q_add_sdhci_usdhc_imx(1, &mx6q_curie_sd2_data);
 	imx6q_add_sdhci_usdhc_imx(2, &mx6q_curie_sd3_data);
+	/* SATA, mx6q only */
+	if (cpu_is_mx6q()) {
+#ifdef CONFIG_SATA_AHCI_PLATFORM
+		imx6q_add_ahci(0, &mx6q_curie_sata_data);
+#else
+		mx6q_curie_sata_init(NULL,
+			(void __iomem *)ioremap(MX6Q_SATA_BASE_ADDR, SZ_4K));
+#endif
+	}
 }
 
 extern void __iomem *twd_base;
