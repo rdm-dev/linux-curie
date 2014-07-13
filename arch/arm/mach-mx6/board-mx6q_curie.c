@@ -78,6 +78,11 @@
 #include "cpu_op-mx6.h"
 #include "board-mx6q_curie.h"
 
+/* CPU Regulator Global */
+extern char *gp_reg_id;
+extern char *soc_reg_id;
+extern char *pu_reg_id;
+
 /* Debug Uart */
 static inline void mx6q_curie_init_uart(void)
 {
@@ -136,6 +141,44 @@ static struct i2c_board_info mx6q_curie_i2c1_board_info[] __initdata = {
 	},
 };
 
+/* DVFS */
+static struct mxc_dvfs_platform_data mx6q_curie_dvfscore_data = {
+	.reg_id = "VDDCORE",
+	.soc_id	= "VDDSOC",
+	.clk1_id = "cpu_clk",
+	.clk2_id = "gpc_dvfs_clk",
+	.gpc_cntr_offset = MXC_GPC_CNTR_OFFSET,
+	.ccm_cdcr_offset = MXC_CCM_CDCR_OFFSET,
+	.ccm_cacrr_offset = MXC_CCM_CACRR_OFFSET,
+	.ccm_cdhipr_offset = MXC_CCM_CDHIPR_OFFSET,
+	.prediv_mask = 0x1F800,
+	.prediv_offset = 11,
+	.prediv_val = 3,
+	.div3ck_mask = 0xE0000000,
+	.div3ck_offset = 29,
+	.div3ck_val = 2,
+	.emac_val = 0x08,
+	.upthr_val = 25,
+	.dnthr_val = 9,
+	.pncthr_val = 33,
+	.upcnt_val = 10,
+	.dncnt_val = 10,
+	.delay_time = 80,
+};
+
+/* PMIC */
+#define CURIE_PMIC_INT        IMX_GPIO_NR(7, 13)
+extern int mx6q_curie_init_pfuze100(u32 int_gpio);
+static void __init mx6q_curie_init_pmic(void)
+{
+	int ret = gpio_request(CURIE_PMIC_INT, "pFUZE-int");
+	if (ret) {
+		printk(KERN_ERR"request pFUZE-int error!!\n");
+		return;
+	}
+	gpio_direction_input(CURIE_PMIC_INT);
+	mx6q_curie_init_pfuze100(CURIE_PMIC_INT);
+}
 
 /* Board Functions */
 static void __init fixup_mxc_board(struct machine_desc *desc, struct tag *tags,
@@ -171,6 +214,13 @@ static void __init mx6_curie_board_init(void)
 	imx6q_add_imx_i2c(2, &mx6q_curie_i2c_data);
 	i2c_register_board_info(1, mx6q_curie_i2c1_board_info,
 			ARRAY_SIZE(mx6q_curie_i2c1_board_info));
+	/* CPU Regulator Global */
+	gp_reg_id = mx6q_curie_dvfscore_data.reg_id;
+	soc_reg_id = mx6q_curie_dvfscore_data.soc_id;
+	/* PMIC */
+	mx6q_curie_init_pmic();
+	/* DVFS */
+	imx6q_add_dvfs_core(&mx6q_curie_dvfscore_data);
 }
 
 extern void __iomem *twd_base;
