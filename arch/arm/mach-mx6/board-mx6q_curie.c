@@ -180,6 +180,26 @@ static void __init mx6q_curie_init_pmic(void)
 	mx6q_curie_init_pfuze100(CURIE_PMIC_INT);
 }
 
+/* PM */
+static void mx6q_curie_suspend_enter(void)
+{
+	/* suspend preparation */
+}
+
+static void mx6q_curie_suspend_exit(void)
+{
+	/* resume restore */
+}
+static const struct pm_platform_data mx6q_curie_pm_data __initconst = {
+	.name = "imx_pm",
+	.suspend_enter = mx6q_curie_suspend_enter,
+	.suspend_exit = mx6q_curie_suspend_exit,
+};
+static void mx6q_curie_snvs_poweroff(void)
+{
+	/* do nothing */
+}
+
 /* Board Functions */
 static void __init fixup_mxc_board(struct machine_desc *desc, struct tag *tags,
 				   char **cmdline, struct meminfo *mi)
@@ -223,6 +243,9 @@ static void __init mx6_curie_board_init(void)
 	imx6q_add_dvfs_core(&mx6q_curie_dvfscore_data);
 	/* Bus Freq */
 	imx6q_add_busfreq();
+	/* PM */
+	imx6q_add_pm_imx(0, &mx6q_curie_pm_data);
+	pm_power_off = mx6q_curie_snvs_poweroff;
 }
 
 extern void __iomem *twd_base;
