@@ -97,6 +97,17 @@ static iomux_v3_cfg_t mx6q_curie_pads[] = {
 
 	/* Wi-Fi CS */
 	MX6Q_PAD_NANDF_D4__GPIO_2_4,
+
+	/* Boot LED */
+	MX6Q_PAD_GPIO_17__GPIO_7_12,
+	/* Error LED */
+	MX6Q_PAD_GPIO_1__GPIO_1_1,
+	/* WiFi LED */
+	MX6Q_PAD_GPIO_6__GPIO_1_6,
+	/* USER LED 1 */
+	MX6Q_PAD_GPIO_2__GPIO_1_2,
+	/* USER LED 2 */
+	MX6Q_PAD_GPIO_9__GPIO_1_9,
 };
 
 #endif
