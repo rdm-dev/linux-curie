@@ -626,6 +626,44 @@ static void __init mx6q_curie_init_video(void)
 	imx6q_add_hdmi_soc_dai();
 }
 
+/* S/PDIF */
+static int spdif_clk_set_rate(struct clk *clk, unsigned long rate)
+{
+	unsigned long rate_actual;
+	rate_actual = clk_round_rate(clk, rate);
+	clk_set_rate(clk, rate_actual);
+	return 0;
+}
+
+static struct mxc_spdif_platform_data mxc_spdif_data = {
+	.spdif_tx		= 1,		/* enable tx */
+	.spdif_rx		= 0,		/* enable rx */
+	/*
+	 * spdif0_clk will be 454.7MHz divided by ccm dividers.
+	 *
+	 * 44.1KHz: 454.7MHz / 7 (ccm) / 23 (spdif) = 44,128 Hz ~ 0.06% error
+	 * 48KHz:   454.7MHz / 4 (ccm) / 37 (spdif) = 48,004 Hz ~ 0.01% error
+	 * 32KHz:   454.7MHz / 6 (ccm) / 37 (spdif) = 32,003 Hz ~ 0.01% error
+	 */
+	.spdif_clk_44100	= 1,    /* tx clk from spdif0_clk_root */
+	.spdif_clk_48000	= 1,    /* tx clk from spdif0_clk_root */
+	.spdif_div_44100	= 23,
+	.spdif_div_48000	= 37,
+	.spdif_div_32000	= 37,
+	.spdif_rx_clk		= 0,    /* rx clk from spdif stream */
+	.spdif_clk_set_rate	= spdif_clk_set_rate,
+	.spdif_clk		= NULL, /* spdif bus clk */
+};
+
+static void __init mx6q_curie_init_spdif(void)
+{
+	mxc_spdif_data.spdif_core_clk = clk_get_sys("mxc_spdif.0", NULL);
+	clk_put(mxc_spdif_data.spdif_core_clk);
+	imx6q_add_spdif(&mxc_spdif_data);
+	imx6q_add_spdif_dai();
+	imx6q_add_spdif_audio_device();
+}
+
 /* Board Functions */
 static void __init fixup_mxc_board(struct machine_desc *desc, struct tag *tags,
 				   char **cmdline, struct meminfo *mi)
@@ -707,6 +745,8 @@ static void __init mx6_curie_board_init(void)
 	imx6q_add_dma();
 	/* Video */
 	mx6q_curie_init_video();
+	/* S/PDIF */
+	mx6q_curie_init_spdif();
 
 }
 

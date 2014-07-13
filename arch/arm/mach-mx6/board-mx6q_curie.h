@@ -114,6 +114,9 @@ static iomux_v3_cfg_t mx6q_curie_pads[] = {
 
 	/* HDMI_CEC_IN*/
 	MX6Q_PAD_EIM_A25__HDMI_TX_CEC_LINE,
+
+	/* S/PDIF OUT */
+	MX6Q_PAD_ENET_RXD0__SPDIF_OUT1,
 };
 
 static iomux_v3_cfg_t mx6q_curie_hdmi_ddc_pads[] = {
