@@ -206,6 +206,33 @@ static const struct anatop_thermal_platform_data
 		.name = "anatop_thermal",
 };
 
+/* VMMC Regulator */
+static struct regulator_consumer_supply mx6q_curie_vmmc_consumers[] = {
+	REGULATOR_SUPPLY("vmmc", "sdhci-esdhc-imx.1"),
+	REGULATOR_SUPPLY("vmmc", "sdhci-esdhc-imx.2"),
+	REGULATOR_SUPPLY("vmmc", "sdhci-esdhc-imx.3"),
+};
+
+static struct regulator_init_data mx6q_curie_vmmc_init = {
+	.num_consumer_supplies = ARRAY_SIZE(mx6q_curie_vmmc_consumers),
+	.consumer_supplies = mx6q_curie_vmmc_consumers,
+};
+
+static struct fixed_voltage_config mx6q_curie_vmmc_reg_config = {
+	.supply_name		= "vmmc",
+	.microvolts		= 3300000,
+	.gpio			= -1,
+	.init_data		= &mx6q_curie_vmmc_init,
+};
+
+static struct platform_device mx6q_curie_vmmc_reg_devices = {
+	.name	= "reg-fixed-voltage",
+	.id	= 3,
+	.dev	= {
+		.platform_data = &mx6q_curie_vmmc_reg_config,
+	},
+};
+
 /* Board Functions */
 static void __init fixup_mxc_board(struct machine_desc *desc, struct tag *tags,
 				   char **cmdline, struct meminfo *mi)
@@ -254,6 +281,8 @@ static void __init mx6_curie_board_init(void)
 	pm_power_off = mx6q_curie_snvs_poweroff;
 	/* Thermal */
 	imx6q_add_anatop_thermal_imx(1, &mx6q_curie_anatop_thermal_data);
+	/* VMMC Regulator */
+	platform_device_register(&mx6q_curie_vmmc_reg_devices);
 }
 
 extern void __iomem *twd_base;
