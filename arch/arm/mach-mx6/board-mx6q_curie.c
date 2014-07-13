@@ -566,6 +566,8 @@ static void __init mx6_curie_board_init(void)
 	mx6q_curie_init_buttons();
 	/* WDT */
 	imx6q_add_imx2_wdt(0, NULL);
+	/* SDMA */
+	imx6q_add_dma();
 }
 
 extern void __iomem *twd_base;
