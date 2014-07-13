@@ -58,6 +58,8 @@ static iomux_v3_cfg_t mx6q_curie_pads[] = {
 	MX6Q_PAD_EIM_D18__I2C3_SDA,
 	MX6Q_PAD_EIM_D17__I2C3_SCL,
 
+	/* PMIC_INT_B */
+	MX6Q_PAD_GPIO_18__GPIO_7_13,
 };
 
 #endif
