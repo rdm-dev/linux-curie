@@ -448,6 +448,47 @@ static void __init mx6q_curie_init_leds(void)
 static void __init mx6q_curie_init_leds(void) {}
 #endif
 
+/* Button */
+#if defined(CONFIG_KEYBOARD_GPIO) || defined(CONFIG_KEYBOARD_GPIO_MODULE)
+#define CURIE_KEY_ENTER       IMX_GPIO_NR(3, 5) 
+
+#define GPIO_BUTTON(gpio_num, ev_code, act_low, descr, wake, debounce)	\
+{								\
+	.gpio		= gpio_num,				\
+	.type		= EV_KEY,				\
+	.code		= ev_code,				\
+	.active_low	= act_low,				\
+	.desc		= "btn " descr,				\
+	.wakeup		= wake,					\
+	.debounce_interval = debounce,				\
+}
+
+static struct gpio_keys_button mx6q_curie_buttons[] = {
+	GPIO_BUTTON(CURIE_KEY_ENTER, KEY_ENTER, 1, "enter", 1, 1),
+};
+
+static struct gpio_keys_platform_data mx6q_curie_button_data = {
+	.buttons	= mx6q_curie_buttons,
+	.nbuttons	= ARRAY_SIZE(mx6q_curie_buttons),
+};
+
+static struct platform_device mx6q_curie_button_device = {
+	.name		= "gpio-keys",
+	.id		= -1,
+	.num_resources  = 0,
+	.dev		= {
+		.platform_data = &mx6q_curie_button_data,
+	}
+};
+
+static void __init mx6q_curie_init_buttons(void)
+{
+	platform_device_register(&mx6q_curie_button_device);
+}
+#else
+static void __init mx6q_curie_init_buttons(void) {}
+#endif
+
 /* Board Functions */
 static void __init fixup_mxc_board(struct machine_desc *desc, struct tag *tags,
 				   char **cmdline, struct meminfo *mi)
@@ -521,6 +562,8 @@ static void __init mx6_curie_board_init(void)
 	mx6q_curie_init_wifi();
 	/* LED */
 	mx6q_curie_init_leds();
+	/* Button */
+	mx6q_curie_init_buttons();
 }
 
 extern void __iomem *twd_base;
