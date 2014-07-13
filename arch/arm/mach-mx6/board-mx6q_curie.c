@@ -221,6 +221,8 @@ static void __init mx6_curie_board_init(void)
 	mx6q_curie_init_pmic();
 	/* DVFS */
 	imx6q_add_dvfs_core(&mx6q_curie_dvfscore_data);
+	/* Bus Freq */
+	imx6q_add_busfreq();
 }
 
 extern void __iomem *twd_base;
