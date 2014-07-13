@@ -152,6 +152,8 @@ static void __init mx6_curie_board_init(void)
 	gpio_direction_output(CURIE_RGMII_RST, 1);
 	mdelay(200);
 	imx6_init_fec(fec_data);
+	/* RTC */
+	imx6q_add_imx_snvs_rtc();
 }
 
 extern void __iomem *twd_base;
