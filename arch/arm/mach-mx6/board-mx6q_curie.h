@@ -108,6 +108,9 @@ static iomux_v3_cfg_t mx6q_curie_pads[] = {
 	MX6Q_PAD_GPIO_2__GPIO_1_2,
 	/* USER LED 2 */
 	MX6Q_PAD_GPIO_9__GPIO_1_9,
+
+	/* USR_DEF_BUTTONs */
+	MX6Q_PAD_EIM_DA5__GPIO_3_5,
 };
 
 #endif
