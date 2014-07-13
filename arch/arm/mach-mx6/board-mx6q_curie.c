@@ -200,6 +200,12 @@ static void mx6q_curie_snvs_poweroff(void)
 	/* do nothing */
 }
 
+/* Thermal */
+static const struct anatop_thermal_platform_data
+		mx6q_curie_anatop_thermal_data __initconst = {
+		.name = "anatop_thermal",
+};
+
 /* Board Functions */
 static void __init fixup_mxc_board(struct machine_desc *desc, struct tag *tags,
 				   char **cmdline, struct meminfo *mi)
@@ -246,6 +252,8 @@ static void __init mx6_curie_board_init(void)
 	/* PM */
 	imx6q_add_pm_imx(0, &mx6q_curie_pm_data);
 	pm_power_off = mx6q_curie_snvs_poweroff;
+	/* Thermal */
+	imx6q_add_anatop_thermal_imx(1, &mx6q_curie_anatop_thermal_data);
 }
 
 extern void __iomem *twd_base;
