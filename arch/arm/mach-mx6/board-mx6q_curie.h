@@ -50,6 +50,14 @@ static iomux_v3_cfg_t mx6q_curie_pads[] = {
 	/* RGMII Interrupt */
 	MX6Q_PAD_ENET_RXD1__GPIO_1_26,
 
+	/* I2C2 for HDMI */
+	MX6Q_PAD_EIM_D16__I2C2_SDA,
+	MX6Q_PAD_EIM_EB2__I2C2_SCL,
+
+	/* I2C3 for PMIC */
+	MX6Q_PAD_EIM_D18__I2C3_SDA,
+	MX6Q_PAD_EIM_D17__I2C3_SCL,
+
 };
 
 #endif
