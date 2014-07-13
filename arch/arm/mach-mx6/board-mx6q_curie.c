@@ -489,6 +489,143 @@ static void __init mx6q_curie_init_buttons(void)
 static void __init mx6q_curie_init_buttons(void) {}
 #endif
 
+/* Video */
+static struct fsl_mxc_hdmi_core_platform_data mx6q_curie_hdmi_core_data = {
+	.ipu_id = 0,
+	.disp_id = 0,
+};
+
+static struct imx_ipuv3_platform_data mx6q_curie_ipu_data[] = {
+	{
+	.rev = 4,
+	.csi_clk[0] = "clko_clk",
+	.bypass_reset = false,
+	}, {
+	.rev = 4,
+	.csi_clk[0] = "clko_clk",
+	.bypass_reset = false,
+	},
+};
+
+static struct ipuv3_fb_platform_data mx6q_curie_fb_data[] = {
+	{/*fb0*/
+	.disp_dev = "hdmi",
+	.interface_pix_fmt = IPU_PIX_FMT_RGB24,
+	.mode_str = "1920x1080M@60",
+	.default_bpp = 32,
+	.int_clk = false,
+	},
+};
+
+struct imx_vout_mem {
+	resource_size_t res_mbase;
+	resource_size_t res_msize;
+};
+
+static struct imx_vout_mem mx6q_curie_vout_mem __initdata = {
+	.res_msize = SZ_128M,
+};
+
+static struct viv_gpu_platform_data mx6q_curie_gpu_pdata __initdata = {
+	.reserved_mem_size = SZ_128M,
+};
+
+static void mx6q_curie_hdmi_init(int ipu_id, int disp_id)
+{
+	int hdmi_mux_setting;
+
+	if ((ipu_id > 1) || (ipu_id < 0)) {
+		pr_err("Invalid IPU select for HDMI: %d. Set to 0\n", ipu_id);
+		ipu_id = 0;
+	}
+
+	if ((disp_id > 1) || (disp_id < 0)) {
+		pr_err("Invalid DI select for HDMI: %d. Set to 0\n", disp_id);
+		disp_id = 0;
+	}
+
+	/* Configure the connection between IPU1/2 and HDMI */
+	hdmi_mux_setting = 2*ipu_id + disp_id;
+
+	/* GPR3, bits 2-3 = HDMI_MUX_CTL */
+	mxc_iomux_set_gpr_register(3, 2, 2, hdmi_mux_setting);
+
+	/* Set HDMI event as SDMA event2 while Chip version later than TO1.2 */
+	if (hdmi_SDMA_check())
+		mxc_iomux_set_gpr_register(0, 0, 1, 1);
+}
+
+/* On mx6q curie board i2c2 iomux with hdmi ddc,
+ * the pins default work at i2c1 function,
+ when hdcp enable, the pins should work at ddc function */
+
+static void mx6q_curie_hdmi_enable_ddc_pin(void)
+{
+	if (cpu_is_mx6q())
+		mxc_iomux_v3_setup_multiple_pads(mx6q_curie_hdmi_ddc_pads,
+			ARRAY_SIZE(mx6q_curie_hdmi_ddc_pads));
+}
+
+static void mx6q_curie_hdmi_disable_ddc_pin(void)
+{
+	if (cpu_is_mx6q())
+		mxc_iomux_v3_setup_multiple_pads(mx6q_curie_hdmi_i2c_pads,
+			ARRAY_SIZE(mx6q_curie_hdmi_i2c_pads));
+}
+
+static struct fsl_mxc_hdmi_platform_data mx6q_curie_hdmi_data = {
+	.init = mx6q_curie_hdmi_init,
+	.enable_pins = mx6q_curie_hdmi_enable_ddc_pin,
+	.disable_pins = mx6q_curie_hdmi_disable_ddc_pin,
+	.phy_reg_vlev = 0x0294,
+	.phy_reg_cksymtx = 0x800d,
+};
+
+static void __init mx6q_curie_init_video(void)
+{
+	struct platform_device *voutdev;
+	int i;
+
+	// hdmi_core
+	imx6q_add_mxc_hdmi_core(&mx6q_curie_hdmi_core_data);
+
+	// ipu
+	imx6q_add_ipuv3(0, &mx6q_curie_ipu_data[0]);
+	if (cpu_is_mx6q()) {
+		imx6q_add_ipuv3(1, &mx6q_curie_ipu_data[1]);
+		for (i = 0; i < 4 && i < ARRAY_SIZE(mx6q_curie_fb_data); i++)
+			imx6q_add_ipuv3fb(i, &mx6q_curie_fb_data[i]);
+	} else {
+		for (i = 0; i < 2 && i < ARRAY_SIZE(mx6q_curie_fb_data); i++)
+			imx6q_add_ipuv3fb(i, &mx6q_curie_fb_data[i]);
+	}
+
+	// vdoa & v4l2 output
+	imx6q_add_vdoa();
+	voutdev = imx6q_add_v4l2_output(0);
+	if (mx6q_curie_vout_mem.res_msize && voutdev) {
+		dma_declare_coherent_memory(&voutdev->dev,
+					    mx6q_curie_vout_mem.res_mbase,
+					    mx6q_curie_vout_mem.res_mbase,
+					    mx6q_curie_vout_mem.res_msize,
+					    (DMA_MEMORY_MAP |
+					     DMA_MEMORY_EXCLUSIVE));
+	}
+
+	// hdmi
+	imx6q_add_mxc_hdmi(&mx6q_curie_hdmi_data);
+
+	// viv_gpu
+	imx_add_viv_gpu(&imx6_gpu_data, &mx6q_curie_gpu_pdata);
+
+	// vpu
+	imx6q_add_vpu();
+
+	// hdmi_soc
+	imx6q_add_hdmi_soc();
+	imx6q_add_hdmi_soc_dai();
+}
+
 /* Board Functions */
 static void __init fixup_mxc_board(struct machine_desc *desc, struct tag *tags,
 				   char **cmdline, struct meminfo *mi)
@@ -568,6 +705,9 @@ static void __init mx6_curie_board_init(void)
 	imx6q_add_imx2_wdt(0, NULL);
 	/* SDMA */
 	imx6q_add_dma();
+	/* Video */
+	mx6q_curie_init_video();
+
 }
 
 extern void __iomem *twd_base;
@@ -590,6 +730,23 @@ static struct sys_timer mx6_curie_timer = {
 
 static void __init mx6q_curie_reserve(void)
 {
+	phys_addr_t phys;
+#if defined(CONFIG_MXC_GPU_VIV) || defined(CONFIG_MXC_GPU_VIV_MODULE)
+
+	if (mx6q_curie_gpu_pdata.reserved_mem_size) {
+		phys = memblock_alloc_base(mx6q_curie_gpu_pdata.reserved_mem_size,
+					   SZ_4K, SZ_1G);
+		memblock_remove(phys, mx6q_curie_gpu_pdata.reserved_mem_size);
+		mx6q_curie_gpu_pdata.reserved_mem_base = phys;
+	}
+#endif
+
+	if (mx6q_curie_vout_mem.res_msize) {
+		phys = memblock_alloc_base(mx6q_curie_vout_mem.res_msize,
+					   SZ_4K, SZ_1G);
+		memblock_remove(phys, mx6q_curie_vout_mem.res_msize);
+		mx6q_curie_vout_mem.res_mbase = phys;
+	}
 }
 
 /*
