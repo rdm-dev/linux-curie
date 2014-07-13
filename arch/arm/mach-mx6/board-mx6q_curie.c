@@ -454,6 +454,9 @@ static void __init mx6_curie_board_init(void)
 			(void __iomem *)ioremap(MX6Q_SATA_BASE_ADDR, SZ_4K));
 #endif
 	}
+	/* OCOTP */
+	imx6q_add_otp();
+	imx6q_add_viim();
 }
 
 extern void __iomem *twd_base;
