@@ -388,6 +388,17 @@ static struct ahci_platform_data mx6q_curie_sata_data = {
 };
 #endif
 
+/* Wi-Fi */
+#define CURIE_WIFI_CS        IMX_GPIO_NR(2, 4)
+static void __init mx6q_curie_init_wifi(void)
+{
+	gpio_request(CURIE_WIFI_CS, "wifi-cs");
+	gpio_direction_output(CURIE_WIFI_CS, 1);
+	mdelay(10);
+	gpio_direction_output(CURIE_WIFI_CS, 0);
+}
+
+
 /* Board Functions */
 static void __init fixup_mxc_board(struct machine_desc *desc, struct tag *tags,
 				   char **cmdline, struct meminfo *mi)
@@ -457,6 +468,8 @@ static void __init mx6_curie_board_init(void)
 	/* OCOTP */
 	imx6q_add_otp();
 	imx6q_add_viim();
+	/* Wi-Fi */
+	mx6q_curie_init_wifi();
 }
 
 extern void __iomem *twd_base;

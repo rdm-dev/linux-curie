@@ -95,6 +95,8 @@ static iomux_v3_cfg_t mx6q_curie_pads[] = {
 	MX6Q_PAD_SD4_DAT6__USDHC4_DAT6_50MHZ,
 	MX6Q_PAD_SD4_DAT7__USDHC4_DAT7_50MHZ,
 
+	/* Wi-Fi CS */
+	MX6Q_PAD_NANDF_D4__GPIO_2_4,
 };
 
 #endif
