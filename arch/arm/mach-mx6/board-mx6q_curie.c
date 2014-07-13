@@ -748,6 +748,11 @@ static void __init mx6_curie_board_init(void)
 	/* S/PDIF */
 	mx6q_curie_init_spdif();
 
+	/* ARM PMU */
+	imx6_add_armpmu();
+	imx6q_add_perfmon(0);
+	imx6q_add_perfmon(1);
+	imx6q_add_perfmon(2);
 }
 
 extern void __iomem *twd_base;
