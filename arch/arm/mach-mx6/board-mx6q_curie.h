@@ -111,6 +111,19 @@ static iomux_v3_cfg_t mx6q_curie_pads[] = {
 
 	/* USR_DEF_BUTTONs */
 	MX6Q_PAD_EIM_DA5__GPIO_3_5,
+
+	/* HDMI_CEC_IN*/
+	MX6Q_PAD_EIM_A25__HDMI_TX_CEC_LINE,
+};
+
+static iomux_v3_cfg_t mx6q_curie_hdmi_ddc_pads[] = {
+	MX6Q_PAD_EIM_D16__HDMI_TX_DDC_SDA, /* HDMI DDC SDA */
+	MX6Q_PAD_EIM_EB2__HDMI_TX_DDC_SCL, /* HDMI DDC SCL */
+};
+
+static iomux_v3_cfg_t mx6q_curie_hdmi_i2c_pads[] = {
+	MX6Q_PAD_EIM_D16__I2C2_SDA,
+	MX6Q_PAD_EIM_EB2__I2C2_SCL,
 };
 
 #endif
