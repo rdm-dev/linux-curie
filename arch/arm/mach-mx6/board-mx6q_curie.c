@@ -398,6 +398,55 @@ static void __init mx6q_curie_init_wifi(void)
 	gpio_direction_output(CURIE_WIFI_CS, 0);
 }
 
+/* LED */
+#if defined(CONFIG_LEDS_TRIGGER) || defined(CONFIG_LEDS_GPIO)
+
+#define CURIE_LED_BOOT       IMX_GPIO_NR(7, 12)
+#define CURIE_LED_WIFI       IMX_GPIO_NR(1, 6)
+#define CURIE_LED_ERROR      IMX_GPIO_NR(1, 1)
+#define CURIE_LED_USER1      IMX_GPIO_NR(1, 2)
+#define CURIE_LED_USER2      IMX_GPIO_NR(1, 9)
+
+#define GPIO_LED(gpio_led, name_led, act_low, state_suspend, trigger)	\
+{									\
+	.gpio			= gpio_led,				\
+	.name			= name_led,				\
+	.active_low		= act_low,				\
+	.retain_state_suspended = state_suspend,			\
+	.default_state		= 0,					\
+	.default_trigger	= trigger,		\
+}
+
+// for Curie, the leds are active low
+static struct gpio_led mx6q_curie_gpio_leds[] = {
+	GPIO_LED(CURIE_LED_BOOT, "boot", 1, 1, "heartbeat"),
+	GPIO_LED(CURIE_LED_WIFI, "wifi", 1, 1, "wifi"),
+	GPIO_LED(CURIE_LED_ERROR, "error", 1, 1, "error"),
+	GPIO_LED(CURIE_LED_USER1, "user1", 1, 1, "user1"),
+	GPIO_LED(CURIE_LED_USER2, "user2", 1, 1, "user2"),
+};
+
+static struct gpio_led_platform_data mx6q_curie_gpio_leds_data = {
+	.leds		= mx6q_curie_gpio_leds,
+	.num_leds	= ARRAY_SIZE(mx6q_curie_gpio_leds),
+};
+
+static struct platform_device mx6q_curie_gpio_led_device = {
+	.name		= "leds-gpio",
+	.id		= -1,
+	.num_resources  = 0,
+	.dev		= {
+		.platform_data = &mx6q_curie_gpio_leds_data,
+	}
+};
+
+static void __init mx6q_curie_init_leds(void)
+{
+	platform_device_register(&mx6q_curie_gpio_led_device);
+}
+#else
+static void __init mx6q_curie_init_leds(void) {}
+#endif
 
 /* Board Functions */
 static void __init fixup_mxc_board(struct machine_desc *desc, struct tag *tags,
@@ -470,6 +519,8 @@ static void __init mx6_curie_board_init(void)
 	imx6q_add_viim();
 	/* Wi-Fi */
 	mx6q_curie_init_wifi();
+	/* LED */
+	mx6q_curie_init_leds();
 }
 
 extern void __iomem *twd_base;
