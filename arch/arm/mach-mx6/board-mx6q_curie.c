@@ -265,10 +265,10 @@ static const struct esdhc_platform_data mx6q_curie_sd4_data __initconst = {
 /* SATA */
 static struct clk *sata_clk;
 /* HW Initialization, if return 0, initialization is successful. */
-static int mx6q_curie_sata_init(struct device *dev, void __iomem *mmio)
+static int mx6q_curie_sata_init(struct device *dev, void __iomem *addr)
 {
 	u32 tmpdata;
-	int ret = 0, i;
+	int ret = 0;
 	struct clk *clk;
 
 	sata_clk = clk_get(dev, "imx_sata_clk");
@@ -297,27 +297,11 @@ static int mx6q_curie_sata_init(struct device *dev, void __iomem *mmio)
 	 *.tx_edgerate_0(iomuxc_gpr13[0]),
 	 */
 	tmpdata = readl(IOMUXC_GPR13);
-	writel(((tmpdata & ~0x07FFFFFF) | 0x0593E4C4), IOMUXC_GPR13);
+	writel(((tmpdata & ~0x07FFFFFD) | 0x0593A044), IOMUXC_GPR13);
 
 	/* enable SATA_PHY PLL */
 	tmpdata = readl(IOMUXC_GPR13);
 	writel(((tmpdata & ~0x2) | 0x2), IOMUXC_GPR13);
-
-	usleep_range(100, 200);
-	sata_phy_cr_addr(SATA_PHY_CR_CLOCK_RESET, mmio);
-	sata_phy_cr_write(SATA_PHY_CR_RESET_EN, mmio);
-	usleep_range(100, 200);
-	/* waiting for the rx_pll is stable */
-	for (i = 0; i <= 5; i++) {
-		sata_phy_cr_addr(SATA_PHY_CR_LANE0_OUT_STAT, mmio);
-		sata_phy_cr_read(&ret, mmio);
-		if (ret & SATA_PHY_CR_LANE0_RX_STABLE) {
-			pr_info("sata phy rx_pll is stable!\n");
-			break;
-		} else if (i == 5)
-			pr_info("wating for sata rx_pll lock time out\n");
-		usleep_range(1000, 2000);
-	}
 
 	/* Get the AHB clock rate, and configure the TIMER1MS reg later */
 	clk = clk_get(NULL, "ahb");
@@ -330,15 +314,15 @@ static int mx6q_curie_sata_init(struct device *dev, void __iomem *mmio)
 	clk_put(clk);
 
 #ifdef CONFIG_SATA_AHCI_PLATFORM
-	ret = sata_init(mmio, tmpdata);
+	ret = sata_init(addr, tmpdata);
 	if (ret == 0)
 		return ret;
 #else
 	usleep_range(1000, 2000);
 	/* AHCI PHY enter into PDDQ mode if the AHCI module is not enabled */
-	tmpdata = readl(mmio + PORT_PHY_CTL);
-	writel(tmpdata | PORT_PHY_CTL_PDDQ_LOC, mmio + PORT_PHY_CTL);
-	pr_info("No AHCI save PWR: PDDQ %s\n", ((readl(mmio + PORT_PHY_CTL)
+	tmpdata = readl(addr + PORT_PHY_CTL);
+	writel(tmpdata | PORT_PHY_CTL_PDDQ_LOC, addr + PORT_PHY_CTL);
+	pr_info("No AHCI save PWR: PDDQ %s\n", ((readl(addr + PORT_PHY_CTL)
 					>> 20) & 1) ? "enabled" : "disabled");
 #endif
 
@@ -359,32 +343,9 @@ static void mx6q_curie_sata_exit(struct device *dev)
 	clk_put(sata_clk);
 }
 
-static int imx_ahci_suspend(struct device *dev)
-{
-	writel((readl(IOMUXC_GPR13) & ~0x2), IOMUXC_GPR13);
-	clk_disable(sata_clk);
-
-	return 0;
-}
-
-static int imx_ahci_resume(struct device *dev)
-{
-	int ret;
-
-	ret = clk_enable(sata_clk);
-	if (ret)
-		dev_err(dev, "can't enable sata clock.\n");
-
-	writel(((readl(IOMUXC_GPR13) & ~0x2) | 0x2), IOMUXC_GPR13);
-
-	return 0;
-}
-
 static struct ahci_platform_data mx6q_curie_sata_data = {
 	.init = mx6q_curie_sata_init,
 	.exit = mx6q_curie_sata_exit,
-	.suspend = imx_ahci_suspend,
-	.resume = imx_ahci_resume,
 };
 #endif
 
