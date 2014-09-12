@@ -478,6 +478,7 @@ static struct ipuv3_fb_platform_data mx6q_curie_fb_data[] = {
 	},
 };
 
+#if 0
 struct imx_vout_mem {
 	resource_size_t res_mbase;
 	resource_size_t res_msize;
@@ -486,6 +487,7 @@ struct imx_vout_mem {
 static struct imx_vout_mem mx6q_curie_vout_mem __initdata = {
 	.res_msize = SZ_128M,
 };
+#endif
 
 static struct viv_gpu_platform_data mx6q_curie_gpu_pdata __initdata = {
 	.reserved_mem_size = SZ_128M,
@@ -561,6 +563,7 @@ static void __init mx6q_curie_init_video(void)
 			imx6q_add_ipuv3fb(i, &mx6q_curie_fb_data[i]);
 	}
 
+#if 0
 	// vdoa & v4l2 output
 	imx6q_add_vdoa();
 	voutdev = imx6q_add_v4l2_output(0);
@@ -572,7 +575,7 @@ static void __init mx6q_curie_init_video(void)
 					    (DMA_MEMORY_MAP |
 					     DMA_MEMORY_EXCLUSIVE));
 	}
-
+#endif
 	// hdmi
 	imx6q_add_mxc_hdmi(&mx6q_curie_hdmi_data);
 
@@ -746,13 +749,14 @@ static void __init mx6q_curie_reserve(void)
 		mx6q_curie_gpu_pdata.reserved_mem_base = phys;
 	}
 #endif
-
+#if 0
 	if (mx6q_curie_vout_mem.res_msize) {
 		phys = memblock_alloc_base(mx6q_curie_vout_mem.res_msize,
 					   SZ_4K, SZ_1G);
 		memblock_remove(phys, mx6q_curie_vout_mem.res_msize);
 		mx6q_curie_vout_mem.res_mbase = phys;
 	}
+#endif
 }
 
 /*
