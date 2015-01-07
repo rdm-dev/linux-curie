@@ -332,16 +332,9 @@ gckKERNEL_MapVideoMemoryEx(
         else
 #endif
         {
-            gctUINT32 baseAddress = 0;
-
-            if (Kernel->hardware->mmuVersion == 0)
-            {
-                gcmkONERROR(gckOS_GetBaseAddress(Kernel->os, &baseAddress));
-            }
-
             gcmkVERIFY_OK(
                 gckHARDWARE_SplitMemory(Kernel->hardware,
-                                        device->contiguousVidMem->baseAddress - baseAddress,
+                                        device->contiguousVidMem->baseAddress,
                                         &pool,
                                         &base));
         }

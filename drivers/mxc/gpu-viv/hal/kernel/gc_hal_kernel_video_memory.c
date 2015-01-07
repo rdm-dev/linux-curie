@@ -525,10 +525,6 @@ gckVIDMEM_Construct(
 
         node->VidMem.locked    = 0;
 
-#if gcdDYNAMIC_MAP_RESERVED_MEMORY && gcdENABLE_VG
-        node->VidMem.kernelVirtual = gcvNULL;
-#endif
-
         gcmkONERROR(gckOS_ZeroMemory(&node->VidMem.sharedInfo, gcmSIZEOF(gcsVIDMEM_NODE_SHARED_INFO)));
 
 #ifdef __QNXNTO__
@@ -1001,14 +997,10 @@ gckVIDMEM_AllocateLinear(
     gctUINT32 alignment;
     gctINT bank, i;
     gctBOOL acquired = gcvFALSE;
-#if gcdSMALL_BLOCK_SIZE
-    gctBOOL force_allocate = (Type == gcvSURF_TILE_STATUS) || (Type & gcvSURF_VG);
-#endif
 
-     gcmkHEADER_ARG("Memory=0x%x Bytes=%lu Alignment=%u Type=%d",
+    gcmkHEADER_ARG("Memory=0x%x Bytes=%lu Alignment=%u Type=%d",
                    Memory, Bytes, Alignment, Type);
 
-    Type &= ~gcvSURF_VG;
     /* Verify the arguments. */
     gcmkVERIFY_OBJECT(Memory, gcvOBJ_VIDMEM);
     gcmkVERIFY_ARGUMENT(Bytes > 0);
@@ -1030,7 +1022,7 @@ gckVIDMEM_AllocateLinear(
 #endif
 
 #if gcdSMALL_BLOCK_SIZE
-    if ((!force_allocate) && (Memory->freeBytes < (Memory->bytes/gcdRATIO_FOR_SMALL_MEMORY))
+    if ((Memory->freeBytes < (Memory->bytes/gcdRATIO_FOR_SMALL_MEMORY))
     &&  (Bytes >= gcdSMALL_BLOCK_SIZE)
     )
     {
@@ -1590,7 +1582,6 @@ _NeedVirtualMapping(
     gctUINT32 end;
     gcePOOL pool;
     gctUINT32 offset;
-    gctUINT32 baseAddress;
 
     gcmkHEADER_ARG("Node=0x%X", Node);
 
@@ -1610,16 +1601,10 @@ _NeedVirtualMapping(
         else
 #endif
         {
-            /* Convert logical address into a physical address. */
-            gcmkONERROR(
-                gckOS_GetPhysicalAddress(Kernel->os, Node->Virtual.logical, &phys));
-
-            gcmkONERROR(gckOS_GetBaseAddress(Kernel->os, &baseAddress));
-
-            gcmkASSERT(phys >= baseAddress);
-
-            /* Subtract baseAddress to get a GPU address used for programming. */
-            phys -= baseAddress;
+            /* For cores which can't access all physical address. */
+            gcmkONERROR(gckHARDWARE_ConvertLogical(Kernel->hardware,
+                        Node->Virtual.logical,
+                        &phys));
 
             /* If part of region is belong to gcvPOOL_VIRTUAL,
             ** whole region has to be mapped. */
@@ -1749,11 +1734,6 @@ gckVIDMEM_Lock(
         gcmkONERROR(gckOS_AcquireMutex(os, Node->Virtual.mutex, gcvINFINITE));
         acquired = gcvTRUE;
 
-#if gcdPAGED_MEMORY_CACHEABLE
-        /* Force video memory cacheable. */
-        Cacheable = gcvTRUE;
-#endif
-
         gcmkONERROR(
             gckOS_LockPages(os,
                             Node->Virtual.physical,
@@ -1822,9 +1802,8 @@ gckVIDMEM_Lock(
                 {
                     /* Allocate pages inside the MMU. */
                     gcmkONERROR(
-                        gckMMU_AllocatePagesEx(Kernel->mmu,
+                        gckMMU_AllocatePages(Kernel->mmu,
                                              Node->Virtual.pageCount,
-                                             Node->Virtual.type,
                                              &Node->Virtual.pageTables[Kernel->core],
                                              &Node->Virtual.addresses[Kernel->core]));
                 }
@@ -2190,40 +2169,34 @@ gckVIDMEM_Unlock(
                     /* No flush required. */
                     flush = (gceKERNEL_FLUSH) 0;
                 }
-                if(hardware)
+
+                gcmkONERROR(
+                    gckHARDWARE_Flush(hardware, flush, gcvNULL, &requested));
+
+                if (requested != 0)
                 {
-                    gcmkONERROR(
-                        gckHARDWARE_Flush(hardware, flush, gcvNULL, &requested));
+                    /* Acquire the command queue. */
+                    gcmkONERROR(gckCOMMAND_EnterCommit(command, gcvFALSE));
+                    commitEntered = gcvTRUE;
 
-                    if (requested != 0)
-                    {
-                        /* Acquire the command queue. */
-                        gcmkONERROR(gckCOMMAND_EnterCommit(command, gcvFALSE));
-                        commitEntered = gcvTRUE;
+                    gcmkONERROR(gckCOMMAND_Reserve(
+                        command, requested, &buffer, &bufferSize
+                        ));
 
-                        gcmkONERROR(gckCOMMAND_Reserve(
-                            command, requested, &buffer, &bufferSize
-                            ));
+                    gcmkONERROR(gckHARDWARE_Flush(
+                        hardware, flush, buffer, &bufferSize
+                        ));
 
-                        gcmkONERROR(gckHARDWARE_Flush(
-                            hardware, flush, buffer, &bufferSize
-                            ));
-
-                        /* Mark node as pending. */
+                    /* Mark node as pending. */
 #ifdef __QNXNTO__
-                        Node->Virtual.unlockPendings[Kernel->core] = gcvTRUE;
+                    Node->Virtual.unlockPendings[Kernel->core] = gcvTRUE;
 #endif
 
-                        gcmkONERROR(gckCOMMAND_Execute(command, requested));
+                    gcmkONERROR(gckCOMMAND_Execute(command, requested));
 
-                        /* Release the command queue. */
-                        gcmkONERROR(gckCOMMAND_ExitCommit(command, gcvFALSE));
-                        commitEntered = gcvFALSE;
-                    }
-                }
-                else
-                {
-                    gckOS_Print("Hardware already is freed.\n");
+                    /* Release the command queue. */
+                    gcmkONERROR(gckCOMMAND_ExitCommit(command, gcvFALSE));
+                    commitEntered = gcvFALSE;
                 }
             }
 

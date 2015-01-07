@@ -201,8 +201,10 @@ _TryToIdleGPU(
 {
     gceSTATUS status;
     gctBOOL empty = gcvFALSE, idle = gcvFALSE;
+    gctUINT32 process, thread;
     gctBOOL powerLocked = gcvFALSE;
     gckHARDWARE hardware;
+
 
     gcmkHEADER_ARG("Event=0x%x", Event);
 
@@ -213,6 +215,7 @@ _TryToIdleGPU(
     hardware = Event->kernel->hardware;
     gcmkVERIFY_OBJECT(hardware, gcvOBJ_HARDWARE);
 
+
     /* Check whether the event queue is empty. */
     gcmkONERROR(gckEVENT_IsEmpty(Event, &empty));
 
@@ -221,17 +224,30 @@ _TryToIdleGPU(
         status = gckOS_AcquireMutex(hardware->os, hardware->powerMutex, 0);
         if (status == gcvSTATUS_TIMEOUT)
         {
-            gcmkFOOTER_NO();
-            return gcvSTATUS_OK;
-        }
+            gcmkONERROR(gckOS_GetProcessID(&process));
+            gcmkONERROR(gckOS_GetThreadID(&thread));
 
-        powerLocked = gcvTRUE;
+            /* Just return to prevent deadlock. */
+            if ((hardware->powerProcess != process)
+            ||  (hardware->powerThread  != thread))
+            {
+                gcmkFOOTER_NO();
+                return gcvSTATUS_OK;
+            }
+        }
+        else
+        {
+            powerLocked = gcvTRUE;
+        }
 
         /* Query whether the hardware is idle. */
         gcmkONERROR(gckHARDWARE_QueryIdle(Event->kernel->hardware, &idle));
 
-        gcmkONERROR(gckOS_ReleaseMutex(hardware->os, hardware->powerMutex));
-        powerLocked = gcvFALSE;
+        if (powerLocked)
+        {
+            gcmkONERROR(gckOS_ReleaseMutex(hardware->os, hardware->powerMutex));
+            powerLocked = gcvFALSE;
+        }
 
         if (idle)
         {
@@ -246,6 +262,7 @@ _TryToIdleGPU(
     return gcvSTATUS_OK;
 
 OnError:
+
     if (powerLocked)
     {
         gcmkONERROR(gckOS_ReleaseMutex(hardware->os, hardware->powerMutex));
@@ -306,33 +323,6 @@ __RemoveRecordFromProcessDB(
                 Record->processID,
                 gcvDB_VIDEO_MEMORY,
                 gcmUINT64_TO_PTR(Record->info.u.FreeVideoMemory.node)));
-
-            {
-                gcuVIDMEM_NODE_PTR node = (gcuVIDMEM_NODE_PTR)(gcmUINT64_TO_PTR(Record->info.u.FreeVideoMemory.node));
-
-                if (node->VidMem.memory->object.type == gcvOBJ_VIDMEM)
-                {
-                     gcmkVERIFY_OK(gckKERNEL_RemoveProcessDB(Event->kernel,
-                                      Record->processID,
-                                      gcvDB_VIDEO_MEMORY_RESERVED,
-                                      node));
-                }
-                else if(node->Virtual.contiguous)
-                {
-                    gcmkVERIFY_OK(gckKERNEL_RemoveProcessDB(Event->kernel,
-                                      Record->processID,
-                                      gcvDB_VIDEO_MEMORY_CONTIGUOUS,
-                                      node));
-                }
-                else
-                {
-                    gcmkVERIFY_OK(gckKERNEL_RemoveProcessDB(Event->kernel,
-                                      Record->processID,
-                                      gcvDB_VIDEO_MEMORY_VIRTUAL,
-                                      node));
-                }
-            }
-
             break;
 
         case gcvHAL_UNLOCK_VIDEO_MEMORY:
@@ -759,13 +749,13 @@ gckEVENT_GetEvent(
         /* Increment the wait timer. */
         timer += 1;
 
-        if (timer == Event->kernel->timeOut)
+        if (timer == gcdGPU_TIMEOUT)
         {
             /* Try to call any outstanding events. */
             gcmkONERROR(gckHARDWARE_Interrupt(Event->kernel->hardware,
                                               gcvTRUE));
         }
-        else if (timer > Event->kernel->timeOut)
+        else if (timer > gcdGPU_TIMEOUT)
         {
             gcmkTRACE_N(
                 gcvLEVEL_ERROR,
@@ -941,7 +931,6 @@ gckEVENT_AddList(
         || (Interface->command == gcvHAL_TIMESTAMP)
         || (Interface->command == gcvHAL_COMMIT_DONE)
         || (Interface->command == gcvHAL_FREE_VIRTUAL_COMMAND_BUFFER)
-        || (Interface->command == gcvHAL_SYNC_POINT)
         );
 
     /* Validate the source. */
@@ -2142,9 +2131,6 @@ gckEVENT_Notify(
                                        gcvINFINITE));
         acquired = gcvTRUE;
 
-        /* We are in the notify loop. */
-        Event->inNotify = gcvTRUE;
-
         /* Grab the event head. */
         record = queue->head;
 
@@ -2477,17 +2463,6 @@ gckEVENT_Notify(
                  break;
 #endif
 
-#if gcdANDROID_NATIVE_FENCE_SYNC
-            case gcvHAL_SYNC_POINT:
-                {
-                    gctSYNC_POINT syncPoint;
-
-                    syncPoint = gcmUINT64_TO_PTR(record->info.u.SyncPoint.syncPoint);
-                    status = gckOS_SignalSyncPoint(Event->os, syncPoint);
-                }
-                break;
-#endif
-
             case gcvHAL_COMMIT_DONE:
                 break;
 
@@ -2530,9 +2505,6 @@ gckEVENT_Notify(
         gcmkONERROR(_TryToIdleGPU(Event));
     }
 
-    /* We are out the notify loop. */
-    Event->inNotify = gcvFALSE;
-
     /* Success. */
     gcmkFOOTER_NO();
     return gcvSTATUS_OK;
@@ -2551,9 +2523,6 @@ OnError:
         gcmkVERIFY_OK(gckOS_ResumeInterruptEx(Event->os, Event->kernel->core));
     }
 #endif
-
-    /* We are out the notify loop. */
-    Event->inNotify = gcvFALSE;
 
     /* Return the status. */
     gcmkFOOTER();
@@ -2902,11 +2871,3 @@ gckEVENT_Dump(
     return gcvSTATUS_OK;
 }
 
-gceSTATUS gckEVENT_WaitEmpty(gckEVENT Event)
-{
-    gctBOOL isEmpty;
-
-    while (Event->inNotify || (gcmIS_SUCCESS(gckEVENT_IsEmpty(Event, &isEmpty)) && !isEmpty)) ;
-
-    return gcvSTATUS_OK;
-}
