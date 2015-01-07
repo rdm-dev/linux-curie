@@ -165,8 +165,6 @@ gckKERNEL_Construct(
     kernel->dvfs         = gcvNULL;
 #endif
 
-    kernel->vidmemMutex  = gcvNULL;
-
     /* Initialize the gckKERNEL object. */
     kernel->object.type = gcvOBJ_KERNEL;
     kernel->os          = Os;
@@ -298,9 +296,6 @@ gckKERNEL_Construct(
 #if gcdANDROID_NATIVE_FENCE_SYNC
     gcmkONERROR(gckOS_CreateSyncTimeline(Os, &kernel->timeline));
 #endif
-
-    /* Construct a video memory mutex. */
-    gcmkONERROR(gckOS_CreateMutex(Os, &kernel->vidmemMutex));
 
     /* Return pointer to the gckKERNEL object. */
     *Kernel = kernel;
@@ -522,8 +517,6 @@ gckKERNEL_Destroy(
 #if gcdANDROID_NATIVE_FENCE_SYNC
     gcmkVERIFY_OK(gckOS_DestroySyncTimeline(Kernel->os, Kernel->timeline));
 #endif
-
-    gcmkVERIFY_OK(gckOS_DeleteMutex(Kernel->os, Kernel->vidmemMutex));
 
     /* Mark the gckKERNEL object as unknown. */
     Kernel->object.type = gcvOBJ_UNKNOWN;
@@ -774,7 +767,7 @@ _AllocateMemory_Retry:
                     {
                         gckOS_Print("gpu virtual memory 0x%x cannot be allocated in force contiguous request!\n", physAddr);
 
-                        gcmkONERROR(gckVIDMEM_Free(Kernel, node));
+                        gcmkONERROR(gckVIDMEM_Free(node));
 
                         node = gcvNULL;
                     }
@@ -804,8 +797,7 @@ _AllocateMemory_Retry:
             if (gcmIS_SUCCESS(status))
             {
                 /* Allocate memory. */
-                status = gckVIDMEM_AllocateLinear(Kernel,
-                                                  videoMemory,
+                status = gckVIDMEM_AllocateLinear(videoMemory,
                                                   Bytes,
                                                   Alignment,
                                                   Type,
@@ -1259,7 +1251,7 @@ gckKERNEL_Dispatch(
 #endif
         /* Free video memory. */
         gcmkONERROR(
-            gckVIDMEM_Free(Kernel, node));
+            gckVIDMEM_Free(node));
 
         gcmkONERROR(
             gckKERNEL_RemoveProcessDB(Kernel,

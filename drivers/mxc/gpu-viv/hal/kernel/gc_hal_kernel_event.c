@@ -2280,7 +2280,7 @@ gckEVENT_Notify(
 
                 /* Free video memory. */
                 status =
-                    gckVIDMEM_Free(Event->kernel, node);
+                    gckVIDMEM_Free(node);
 
                 break;
 

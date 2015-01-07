@@ -1060,7 +1060,6 @@ _AllocateLinear(
 
         /* Free the command buffer. */
         gcmkCHECK_STATUS(gckVIDMEM_Free(
-            Command->kernel->kernel,
             node
             ));
     }
@@ -1083,7 +1082,7 @@ _FreeLinear(
         gcmkERR_BREAK(gckVIDMEM_Unlock(Kernel->kernel, Node, gcvSURF_TYPE_UNKNOWN, gcvNULL));
 
         /* Free the linear buffer. */
-        gcmkERR_BREAK(gckVIDMEM_Free(Kernel->kernel, Node));
+        gcmkERR_BREAK(gckVIDMEM_Free(Node));
     }
     while (gcvFALSE);
 
@@ -1677,7 +1676,7 @@ _TaskFreeVideoMemory(
             = (gcsTASK_FREE_VIDEO_MEMORY_PTR) TaskHeader->task;
 
         /* Free video memory. */
-        gcmkERR_BREAK(gckVIDMEM_Free(Command->kernel->kernel, gcmUINT64_TO_PTR(task->node)));
+        gcmkERR_BREAK(gckVIDMEM_Free(gcmUINT64_TO_PTR(task->node)));
 
         /* Update the reference counter. */
         TaskHeader->container->referenceCount -= 1;
