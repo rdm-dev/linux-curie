@@ -572,33 +572,30 @@ static int force_contiguous_lowmem_shrink(IN gckKERNEL Kernel)
 		struct mm_struct *mm;
 		struct signal_struct *sig;
                 gcuDATABASE_INFO info;
-		int oom_adj, pid;
+		int oom_adj;
 
 		task_lock(p);
 		mm = p->mm;
 		sig = p->signal;
-                pid = p->pid;
 		if (!mm || !sig) {
 			task_unlock(p);
 			continue;
 		}
 		oom_adj = sig->oom_adj;
-		task_unlock(p);
 		if (oom_adj < min_adj) {
+			task_unlock(p);
 			continue;
 		}
 
-                read_unlock(&tasklist_lock);
-
 		tasksize = 0;
-		if (gckKERNEL_QueryProcessDB(Kernel, pid, gcvFALSE, gcvDB_VIDEO_MEMORY, &info) == gcvSTATUS_OK){
+		if (gckKERNEL_QueryProcessDB(Kernel, p->pid, gcvFALSE, gcvDB_VIDEO_MEMORY, &info) == gcvSTATUS_OK){
 			tasksize += info.counters.bytes / PAGE_SIZE;
 		}
-		if (gckKERNEL_QueryProcessDB(Kernel, pid, gcvFALSE, gcvDB_CONTIGUOUS, &info) == gcvSTATUS_OK){
+		if (gckKERNEL_QueryProcessDB(Kernel, p->pid, gcvFALSE, gcvDB_CONTIGUOUS, &info) == gcvSTATUS_OK){
 			tasksize += info.counters.bytes / PAGE_SIZE;
 		}
 
-                read_lock(&tasklist_lock);
+		task_unlock(p);
 
 		if (tasksize <= 0)
 			continue;
