@@ -55,6 +55,9 @@ static inline void esdhc_set_clock(struct sdhci_host *host, unsigned int clock)
 	int ddr_mode = 0;
 	struct platform_device *pdev = to_platform_device(host->mmc->parent);
 
+	if (clock == 0)
+		goto out;
+
 	boarddata = host->mmc->parent->platform_data;
 	if (cpu_is_mx6q() || cpu_is_mx6dl()) {
 		pre_div = 1;
@@ -68,9 +71,6 @@ static inline void esdhc_set_clock(struct sdhci_host *host, unsigned int clock)
 	temp &= ~(ESDHC_CLOCK_IPGEN | ESDHC_CLOCK_HCKEN | ESDHC_CLOCK_PEREN
 		| ESDHC_CLOCK_MASK);
 	sdhci_writel(host, temp, ESDHC_SYSTEM_CONTROL);
-
-	if (clock == 0)
-		goto out;
 
 	while (host->max_clk / pre_div / 16 > clock && pre_div < 256)
 		pre_div *= 2;
