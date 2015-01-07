@@ -274,13 +274,16 @@ static void spd_release_page(struct splice_pipe_desc *spd, unsigned int i)
  * Check if we need to grow the arrays holding pages and partial page
  * descriptions.
  */
-int splice_grow_spd(struct pipe_inode_info *pipe, struct splice_pipe_desc *spd)
+int splice_grow_spd(const struct pipe_inode_info *pipe, struct splice_pipe_desc *spd)
 {
-	if (pipe->buffers <= PIPE_DEF_BUFFERS)
+	unsigned int buffers = ACCESS_ONCE(pipe->buffers);
+
+	spd->nr_pages_max = buffers;
+	if (buffers <= PIPE_DEF_BUFFERS)
 		return 0;
 
-	spd->pages = kmalloc(pipe->buffers * sizeof(struct page *), GFP_KERNEL);
-	spd->partial = kmalloc(pipe->buffers * sizeof(struct partial_page), GFP_KERNEL);
+	spd->pages = kmalloc(buffers * sizeof(struct page *), GFP_KERNEL);
+	spd->partial = kmalloc(buffers * sizeof(struct partial_page), GFP_KERNEL);
 
 	if (spd->pages && spd->partial)
 		return 0;
@@ -290,10 +293,9 @@ int splice_grow_spd(struct pipe_inode_info *pipe, struct splice_pipe_desc *spd)
 	return -ENOMEM;
 }
 
-void splice_shrink_spd(struct pipe_inode_info *pipe,
-		       struct splice_pipe_desc *spd)
+void splice_shrink_spd(struct splice_pipe_desc *spd)
 {
-	if (pipe->buffers <= PIPE_DEF_BUFFERS)
+	if (spd->nr_pages_max <= PIPE_DEF_BUFFERS)
 		return;
 
 	kfree(spd->pages);
@@ -316,6 +318,7 @@ __generic_file_splice_read(struct file *in, loff_t *ppos,
 	struct splice_pipe_desc spd = {
 		.pages = pages,
 		.partial = partial,
+		.nr_pages_max = PIPE_DEF_BUFFERS,
 		.flags = flags,
 		.ops = &page_cache_pipe_buf_ops,
 		.spd_release = spd_release_page,
@@ -327,7 +330,7 @@ __generic_file_splice_read(struct file *in, loff_t *ppos,
 	index = *ppos >> PAGE_CACHE_SHIFT;
 	loff = *ppos & ~PAGE_CACHE_MASK;
 	req_pages = (len + loff + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
-	nr_pages = min(req_pages, pipe->buffers);
+	nr_pages = min(req_pages, spd.nr_pages_max);
 
 	/*
 	 * Lookup the (hopefully) full range of pages we need.
@@ -498,7 +501,7 @@ fill_it:
 	if (spd.nr_pages)
 		error = splice_to_pipe(pipe, &spd);
 
-	splice_shrink_spd(pipe, &spd);
+	splice_shrink_spd(&spd);
 	return error;
 }
 
@@ -599,6 +602,7 @@ ssize_t default_file_splice_read(struct file *in, loff_t *ppos,
 	struct splice_pipe_desc spd = {
 		.pages = pages,
 		.partial = partial,
+		.nr_pages_max = PIPE_DEF_BUFFERS,
 		.flags = flags,
 		.ops = &default_pipe_buf_ops,
 		.spd_release = spd_release_page,
@@ -609,8 +613,8 @@ ssize_t default_file_splice_read(struct file *in, loff_t *ppos,
 
 	res = -ENOMEM;
 	vec = __vec;
-	if (pipe->buffers > PIPE_DEF_BUFFERS) {
-		vec = kmalloc(pipe->buffers * sizeof(struct iovec), GFP_KERNEL);
+	if (spd.nr_pages_max > PIPE_DEF_BUFFERS) {
+		vec = kmalloc(spd.nr_pages_max * sizeof(struct iovec), GFP_KERNEL);
 		if (!vec)
 			goto shrink_ret;
 	}
@@ -618,7 +622,7 @@ ssize_t default_file_splice_read(struct file *in, loff_t *ppos,
 	offset = *ppos & ~PAGE_CACHE_MASK;
 	nr_pages = (len + offset + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
 
-	for (i = 0; i < nr_pages && i < pipe->buffers && len; i++) {
+	for (i = 0; i < nr_pages && i < spd.nr_pages_max && len; i++) {
 		struct page *page;
 
 		page = alloc_page(GFP_USER);
@@ -666,7 +670,7 @@ ssize_t default_file_splice_read(struct file *in, loff_t *ppos,
 shrink_ret:
 	if (vec != __vec)
 		kfree(vec);
-	splice_shrink_spd(pipe, &spd);
+	splice_shrink_spd(&spd);
 	return res;
 
 err:
@@ -693,8 +697,10 @@ static int pipe_to_sendpage(struct pipe_inode_info *pipe,
 		return -EINVAL;
 
 	more = (sd->flags & SPLICE_F_MORE) ? MSG_MORE : 0;
-	if (sd->len < sd->total_len)
+
+	if (sd->len < sd->total_len && pipe->nrbufs > 1)
 		more |= MSG_SENDPAGE_NOTLAST;
+
 	return file->f_op->sendpage(file, buf->page, buf->offset,
 				    sd->len, &pos, more);
 }
@@ -1088,8 +1094,8 @@ EXPORT_SYMBOL(generic_splice_sendpage);
 /*
  * Attempt to initiate a splice from pipe to file.
  */
-static long do_splice_from(struct pipe_inode_info *pipe, struct file *out,
-			   loff_t *ppos, size_t len, unsigned int flags)
+long vfs_splice_from(struct pipe_inode_info *pipe, struct file *out,
+		     loff_t *ppos, size_t len, unsigned int flags)
 {
 	ssize_t (*splice_write)(struct pipe_inode_info *, struct file *,
 				loff_t *, size_t, unsigned int);
@@ -1112,13 +1118,14 @@ static long do_splice_from(struct pipe_inode_info *pipe, struct file *out,
 
 	return splice_write(pipe, out, ppos, len, flags);
 }
+EXPORT_SYMBOL_GPL(vfs_splice_from);
 
 /*
  * Attempt to initiate a splice from a file to a pipe.
  */
-static long do_splice_to(struct file *in, loff_t *ppos,
-			 struct pipe_inode_info *pipe, size_t len,
-			 unsigned int flags)
+long vfs_splice_to(struct file *in, loff_t *ppos,
+		   struct pipe_inode_info *pipe, size_t len,
+		   unsigned int flags)
 {
 	ssize_t (*splice_read)(struct file *, loff_t *,
 			       struct pipe_inode_info *, size_t, unsigned int);
@@ -1138,6 +1145,7 @@ static long do_splice_to(struct file *in, loff_t *ppos,
 
 	return splice_read(in, ppos, pipe, len, flags);
 }
+EXPORT_SYMBOL_GPL(vfs_splice_to);
 
 /**
  * splice_direct_to_actor - splices data directly between two non-pipes
@@ -1207,7 +1215,7 @@ ssize_t splice_direct_to_actor(struct file *in, struct splice_desc *sd,
 		size_t read_len;
 		loff_t pos = sd->pos, prev_pos = pos;
 
-		ret = do_splice_to(in, &pos, pipe, len, flags);
+		ret = vfs_splice_to(in, &pos, pipe, len, flags);
 		if (unlikely(ret <= 0))
 			goto out_release;
 
@@ -1266,8 +1274,8 @@ static int direct_splice_actor(struct pipe_inode_info *pipe,
 {
 	struct file *file = sd->u.file;
 
-	return do_splice_from(pipe, file, &file->f_pos, sd->total_len,
-			      sd->flags);
+	return vfs_splice_from(pipe, file, &file->f_pos, sd->total_len,
+			       sd->flags);
 }
 
 /**
@@ -1352,7 +1360,7 @@ static long do_splice(struct file *in, loff_t __user *off_in,
 		} else
 			off = &out->f_pos;
 
-		ret = do_splice_from(ipipe, out, off, len, flags);
+		ret = vfs_splice_from(ipipe, out, off, len, flags);
 
 		if (off_out && copy_to_user(off_out, off, sizeof(loff_t)))
 			ret = -EFAULT;
@@ -1372,7 +1380,7 @@ static long do_splice(struct file *in, loff_t __user *off_in,
 		} else
 			off = &in->f_pos;
 
-		ret = do_splice_to(in, off, opipe, len, flags);
+		ret = vfs_splice_to(in, off, opipe, len, flags);
 
 		if (off_in && copy_to_user(off_in, off, sizeof(loff_t)))
 			ret = -EFAULT;
@@ -1616,6 +1624,7 @@ static long vmsplice_to_pipe(struct file *file, const struct iovec __user *iov,
 	struct splice_pipe_desc spd = {
 		.pages = pages,
 		.partial = partial,
+		.nr_pages_max = PIPE_DEF_BUFFERS,
 		.flags = flags,
 		.ops = &user_page_pipe_buf_ops,
 		.spd_release = spd_release_page,
@@ -1631,13 +1640,13 @@ static long vmsplice_to_pipe(struct file *file, const struct iovec __user *iov,
 
 	spd.nr_pages = get_iovec_page_array(iov, nr_segs, spd.pages,
 					    spd.partial, flags & SPLICE_F_GIFT,
-					    pipe->buffers);
+					    spd.nr_pages_max);
 	if (spd.nr_pages <= 0)
 		ret = spd.nr_pages;
 	else
 		ret = splice_to_pipe(pipe, &spd);
 
-	splice_shrink_spd(pipe, &spd);
+	splice_shrink_spd(&spd);
 	return ret;
 }
 
